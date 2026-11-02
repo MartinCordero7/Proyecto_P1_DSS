@@ -29,7 +29,7 @@ Proyecto_1P_SS/
 
 ---
 
-## Responsabilidades Implementadas (Persona 1 — STEGO)
+## Responsabilidades Implementadas (Cordero — STEGO)
 
 1. **Configuración y Arquitectura**: Configuración de Node.js, Express y arquitectura modular por capas (`routes`, `controllers`, `middlewares`, `services`, `contracts`, `utils`).
 2. **Recepción Segura de Imágenes**: Subida controlada vía `multipart/form-data` con Multer transmitiendo a disco en almacenamiento temporal restringido (`0o700`).
