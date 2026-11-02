@@ -1,0 +1,282 @@
+openapi: 3.0.3
+info:
+  title: STEGO Microservice API - Persona 1
+  version: 1.0.0
+  description: |
+    Microservicio de recepción segura, validación, almacenamiento de imágenes y autorización RBAC
+    para la detección de esteganografía. Desarrollado como parte del Proyecto Integrador de Desarrollo
+    de Software Seguro (Backend V1).
+    
+    ### Principios de Seguridad Implementados:
+    - **Zero Trust**: La validez criptográfica de un JWT no presupone privilegios vigentes. Toda operación protegida consulta en tiempo real al microservicio AUTH (`POST /internal/authorization/check`).
+    - **Secure by Design**: Recepción aislada mediante nombres UUID aleatorios, validación de firmas binarias (magic bytes), decodificación estricta de imágenes, mitigación de path traversal y eliminación de archivos temporales en errores.
+    - **Shift Left Security**: Batería exhaustiva de pruebas unitarias, de integración y de seguridad contra ataques de suplantación de extensiones, imágenes corruptas y fallas controladas.
+servers:
+  - url: http://localhost:4000
+    description: Servidor de desarrollo local
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/steganography/analyze:
+    post:
+      summary: Analizar imagen en busca de contenido esteganográfico
+      description: |
+        Recibe un archivo de imagen en formato multipart/form-data, valida la autenticidad criptográfica
+        del token JWT, verifica los privilegios RBAC vigentes ante AUTH, comprueba la firma binaria real
+        (magic bytes), MIME, dimensiones y ausencia de corrupción, calcula el hash SHA-256 original y
+        delega el análisis al motor de la Persona 2.
+      operationId: analyzeImage
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Archivo de imagen a analizar (únicamente formatos PNG y BMP válidos).
+      responses:
+        '200':
+          description: Análisis ejecutado satisfactoriamente por el motor de análisis.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+              example:
+                analysis_id: "7f4c51e0-639a-4c22-b5e1-0c4a45719e71"
+                user_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                filename: "muestra.png"
+                sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                technique: "lsb_statistical_analysis"
+                status: "sospechoso"
+                indicators:
+                  anomaly_score: 0.82
+                  threshold: 0.75
+                action: "cuarentena"
+                limitations: "Resultado indicativo, no concluyente"
+        '400':
+          description: Solicitud incorrecta (archivo ausente o campo no válido).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "IMAGE_FIELD_MISSING"
+                  message: "No image file was received. Field 'image' is required."
+        '401':
+          description: Autenticación ausente, vencida o con firma inválida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "TOKEN_INVALID"
+                  message: "Authentication token is invalid or signature is tampered"
+        '403':
+          description: Permisos insuficientes o rol revocado por AUTH.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "AUTHORIZATION_DENIED"
+                  message: "Access denied: Active roles do not grant permission for this operation"
+        '413':
+          description: El archivo excede el tamaño máximo permitido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "FILE_SIZE_LIMIT_EXCEEDED"
+                  message: "File size exceeds maximum allowed limit of 5242880 bytes"
+        '415':
+          description: Formato o extensión no permitida, o suplantación de extensión detectada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "EXTENSION_SPOOFING_DETECTED"
+                  message: "Extension spoofing detected: file claims extension '.png' but real format is '.jpg'"
+        '422':
+          description: Imagen corrupta, truncada o con dimensiones excesivas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "IMAGE_CORRUPTED"
+                  message: "Image file is corrupted or could not be decoded"
+        '500':
+          description: Error interno en el microservicio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "INTERNAL_SERVER_ERROR"
+                  message: "An internal server error occurred while processing the request"
+        '501':
+          description: Motor de análisis esteganográfico no conectado (módulo Persona 2 pendiente).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "ENGINE_NOT_IMPLEMENTED"
+                  message: "Steganography analysis engine is not yet connected (Persona 2 module pending)"
+        '503':
+          description: Microservicio AUTH no disponible o decisión de autorización no verificable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "AUTH_SERVICE_UNAVAILABLE"
+                  message: "Authorization service (AUTH) is unavailable or unreachable"
+
+  /api/steganography/results/{id}:
+    get:
+      summary: Consultar un resultado de análisis por identificador
+      description: |
+        Consulta un análisis previamente registrado. Verifica la autenticación JWT y consulta en AUTH
+        la autorización vigente y la propiedad sobre el recurso solicitado.
+      operationId: getAnalysisResult
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID o identificador del análisis
+          schema:
+            type: string
+          example: "7f4c51e0-639a-4c22-b5e1-0c4a45719e71"
+      responses:
+        '200':
+          description: Registro de análisis recuperado con éxito.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+        '401':
+          description: Autenticación ausente o inválida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Usuario sin privilegios RBAC o sin propiedad sobre el recurso en AUTH.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Resultado no encontrado en el repositorio de persistencia.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "NOT_FOUND"
+                  message: "Analysis result with ID '7f4c51e0-639a-4c22-b5e1-0c4a45719e71' was not found"
+        '501':
+          description: Repositorio de resultados de la Persona 2 aún no conectado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Microservicio AUTH inaccesible para verificar permisos sobre el recurso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      summary: Comprobación de estado del microservicio STEGO
+      security: []
+      responses:
+        '200':
+          description: Microservicio operativo
+          content:
+            application/json:
+              example:
+                status: "healthy"
+                service: "stego-ms"
+                timestamp: "2026-11-04T12:00:00.000Z"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT asimétrico emitido por el microservicio AUTH (RS256).
+
+  schemas:
+    AnalysisResponse:
+      type: object
+      properties:
+        analysis_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        sha256:
+          type: string
+          example: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        technique:
+          type: string
+          example: "lsb_statistical_analysis"
+        status:
+          type: string
+          enum: [sin_indicios, sospechoso, no_concluyente, con_error]
+        indicators:
+          type: object
+          additionalProperties: true
+        action:
+          type: string
+          enum: [aprobado, advertencia, cuarentena, rechazo]
+        limitations:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+
