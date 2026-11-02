@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+.env
+.git
+.gitignore
+tests
+coverage
+docs
+storage/temporary/*
+!storage/temporary/.gitkeep
+storage/quarantine/*
+!storage/quarantine/.gitkeep
+

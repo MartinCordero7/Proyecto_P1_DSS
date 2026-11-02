@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.local
+storage/temporary/*
+!storage/temporary/.gitkeep
+storage/quarantine/*
+!storage/quarantine/.gitkeep
+coverage/
+*.log
+.DS_Store
+
