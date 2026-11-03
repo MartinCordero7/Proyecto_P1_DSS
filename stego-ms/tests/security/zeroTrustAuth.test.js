@@ -13,6 +13,12 @@ describe('Security: Zero Trust & RBAC Dynamic Authorization', () => {
   beforeAll(async () => {
     validToken = createValidTestToken({ sub: 'user-uuid-rbac-test' });
     validPngBuffer = await createValidPngBuffer(1, 1);
+
+    // Every successful analysis is persisted, so the API needs a repository to complete.
+    require('../../src/services/results.service').registerRepository({
+      save: async (record) => record,
+      findById: async () => null
+    });
   });
 
   afterEach(() => {

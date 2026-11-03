@@ -10,13 +10,32 @@ class ResultsService {
    * Persona 2 simply connects their database repository by calling:
    * resultsService.registerRepository(myResultsRepository);
    * 
-   * @param {Object} repo - Repository object with a findById(id) method.
+   * @param {Object} repo - Repository object with findById(id) and save(result) methods.
    */
   registerRepository(repo) {
-    if (!repo || typeof repo.findById !== 'function') {
-      throw new Error('Results repository must provide a "findById(id)" method');
+    if (!repo || typeof repo.findById !== 'function' || typeof repo.save !== 'function') {
+      throw new Error('Results repository must provide "findById(id)" and "save(result)" methods');
     }
     this.repository = repo;
+  }
+
+  /**
+   * Persists an analysis record produced by the engine.
+   *
+   * @param {Object} record - Analysis record (see analysisEngine contract).
+   * @returns {Promise<Object>} The stored record.
+   */
+  async saveResult(record) {
+    if (!this.repository) {
+      throw new AppError(
+        'Results persistence repository is not yet connected (Persona 2 module pending)',
+        501,
+        'REPOSITORY_NOT_IMPLEMENTED',
+        { contractStatus: 'ready_for_persona_2' }
+      );
+    }
+
+    return await this.repository.save(record);
   }
 
   /**

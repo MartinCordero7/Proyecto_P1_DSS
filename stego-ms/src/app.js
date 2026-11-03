@@ -3,12 +3,16 @@ const helmet = require('helmet');
 const cors = require('cors');
 const steganographyRoutes = require('./routes/steganography.routes');
 const errorHandler = require('./middlewares/error.middleware');
+const accessLog = require('./middlewares/accessLog.middleware');
 const { BadRequestError } = require('./utils/errors');
 
 const app = express();
 
 // Secure HTTP headers
 app.use(helmet());
+
+// Access audit log (no headers or bodies, so JWTs never reach the logs)
+app.use(accessLog);
 
 // Cross-Origin Resource Sharing
 app.use(cors());

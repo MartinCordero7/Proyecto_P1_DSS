@@ -43,6 +43,7 @@ describe('Integration: Steganography API Endpoints', () => {
 
     // Register a mock repository for Persona 2's results persistence
     resultsService.registerRepository({
+      save: async (record) => record,
       findById: async (id) => {
         if (id === 'existing-analysis-uuid') {
           return {
