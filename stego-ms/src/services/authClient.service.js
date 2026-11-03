@@ -42,7 +42,17 @@ class AuthClientService {
     };
 
     try {
-      const response = await this.client.post('/internal/authorization/check', payload);
+      let response;
+      try {
+        response = await this.client.post('/internal/authorization/check', payload);
+      } catch (postErr) {
+        // Resilient fallback: if AUTH has global prefix /api/v1/auth and baseUrl was root
+        if (postErr.response && postErr.response.status === 404 && !this.config.baseUrl.includes('/api/v1/auth')) {
+          response = await this.client.post('/api/v1/auth/internal/authorization/check', payload);
+        } else {
+          throw postErr;
+        }
+      }
 
       if (response.status === 200 && response.data) {
         const { allowed, subject_id, reason } = response.data;

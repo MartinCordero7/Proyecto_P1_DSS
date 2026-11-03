@@ -117,6 +117,16 @@ export class AuthService implements OnModuleInit {
           allowed = true;
           reason = 'active_role_grants_permission';
         }
+      } else if (
+        dto.action === 'steganography.view_result' ||
+        dto.action === 'steganography.results.view'
+      ) {
+        if (roles.includes('ADMIN') || roles.includes('ANALYST')) {
+          allowed = true;
+          reason = 'active_role_grants_permission';
+        } else {
+          reason = 'user_role_lacks_permission';
+        }
       } else {
         // En caso de que STEGO pregunte por otra ruta a futuro
         reason = 'unknown_action'; 

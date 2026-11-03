@@ -2,9 +2,11 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Post,
+  UnauthorizedException,
 } from '@nestjs/common';
 
 import { Throttle } from '@nestjs/throttler';
@@ -63,10 +65,18 @@ export class AuthController {
   // <-- CAMBIO APLICADO AQUÍ -->
   // 1. Agregamos el decorador @Public() para evitar que el JwtAuthGuard global bloquee la petición
   // 2. Mantenemos el @Body() dto: CheckAuthorizationDto para recibir el token de STEGO
+  // 3. Verificamos la credencial de servicio S2S (X-Service-Credential) para proteger la identidad de STEGO ante AUTH
   @Public()
   @Post('internal/authorization/check')
   @HttpCode(HttpStatus.OK)
-  checkAuthorization(@Body() dto: CheckAuthorizationDto) {
+  checkAuthorization(
+    @Body() dto: CheckAuthorizationDto,
+    @Headers('x-service-credential') serviceCredential?: string,
+  ) {
+    const expectedCredential = process.env.AUTH_SERVICE_CREDENTIAL;
+    if (expectedCredential && serviceCredential !== expectedCredential) {
+      throw new UnauthorizedException('Invalid service credential for internal authorization check');
+    }
     return this.authService.checkAuthorization(dto);
   }
 }
