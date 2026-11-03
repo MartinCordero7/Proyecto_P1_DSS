@@ -13,6 +13,7 @@ import { Public } from './decorators/public/public.decorator.js';
 import { LoginDto } from './dto/login.dto/login.dto.js';
 import { CurrentUser } from './decorators/current-user/current-user.decorator.js';
 import type { AuthenticatedUser } from './interfaces/authenticated-user/authenticated-user.interface.js';
+import { CheckAuthorizationDto } from './dto/check-authorization.dto.js';
 
 @Controller('auth')
 export class AuthController {
@@ -57,5 +58,15 @@ export class AuthController {
     user: AuthenticatedUser,
   ): Promise<void> {
     await this.authService.logout(user.userId);
+  }
+
+  // <-- CAMBIO APLICADO AQUÍ -->
+  // 1. Agregamos el decorador @Public() para evitar que el JwtAuthGuard global bloquee la petición
+  // 2. Mantenemos el @Body() dto: CheckAuthorizationDto para recibir el token de STEGO
+  @Public()
+  @Post('internal/authorization/check')
+  @HttpCode(HttpStatus.OK)
+  checkAuthorization(@Body() dto: CheckAuthorizationDto) {
+    return this.authService.checkAuthorization(dto);
   }
 }
