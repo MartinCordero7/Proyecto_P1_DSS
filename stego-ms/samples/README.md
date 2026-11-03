@@ -5,7 +5,7 @@ Conjunto reproducible de imágenes **originales** (sin modificaciones conocidas)
 
 ```
 samples/
-├── covers/       Fotografías de partida (PNG/JPG/BMP). Solo imágenes propias o de licencia libre.
+├── covers/       Fotografías de partida (PNG/JPG/BMP). NO se versiona (metadatos EXIF: GPS, fecha, modelo).
 ├── generated/    Muestras generadas + manifest.json (SHA-256, técnica, tamaño de la carga, resultado esperado)
 └── resultados.md Resultados reales del motor sobre las muestras
 ```

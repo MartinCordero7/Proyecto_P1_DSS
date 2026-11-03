@@ -1,0 +1,287 @@
+[
+  {
+    "file": "IMG_5479_original.png",
+    "cover": "IMG_5479.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": null,
+    "expected": "sin_indicios",
+    "sha256": "ad9159739c4accedb09bdbbc801baf98ecfa375810d5a4dc5f9bf8b8acd88fbb"
+  },
+  {
+    "file": "IMG_5479_original.bmp",
+    "cover": "IMG_5479.JPG",
+    "format": "bmp",
+    "width": 640,
+    "height": 853,
+    "hidden_data": null,
+    "expected": "sin_indicios",
+    "sha256": "544ec13792637e4afccc3cdce2e90185d5396a7c4f2ed55976faa9a93ae9a419"
+  },
+  {
+    "file": "IMG_5479_lsb_aleatorio_100.png",
+    "cover": "IMG_5479.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 1,
+      "payload_bytes": 204716
+    },
+    "expected": "sospechoso",
+    "sha256": "76738401bdc7fd0996f0ae9fb749b8a2cb0ae32b035d28a16287878634fdd4d3"
+  },
+  {
+    "file": "IMG_5479_lsb_aleatorio_50.png",
+    "cover": "IMG_5479.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 0.5,
+      "payload_bytes": 102358
+    },
+    "expected": "sospechoso",
+    "sha256": "cebbb9d96977969cb3524d489e6251308e9bc61e587521267ca7be96b2087fa5"
+  },
+  {
+    "file": "IMG_5479_lsb_aleatorio_50.bmp",
+    "cover": "IMG_5479.JPG",
+    "format": "bmp",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 0.5,
+      "payload_bytes": 102358
+    },
+    "expected": "sospechoso",
+    "sha256": "77f1440170b44facd554463f113f6c39bb91dc9ed33165b092fab1680c7fadec"
+  },
+  {
+    "file": "IMG_5479_lsb_aleatorio_10.png",
+    "cover": "IMG_5479.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 0.1,
+      "payload_bytes": 20471
+    },
+    "expected": "no_garantizado",
+    "sha256": "d02244d3710bb07cfaace8ef1de8b45766bb767b1336de92c4de7be7c29309ef"
+  },
+  {
+    "file": "IMG_5479_lsb_texto_100.png",
+    "cover": "IMG_5479.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "text",
+      "fill_ratio": 1,
+      "payload_bytes": 204716
+    },
+    "expected": "no_garantizado",
+    "sha256": "f7491e8c33b53b20814a1b86d51d1b9b79c6ed9979073b5c076131bbf3364a0c"
+  },
+  {
+    "file": "IMG_9974_original.png",
+    "cover": "IMG_9974.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": null,
+    "expected": "sin_indicios",
+    "sha256": "2ed7eff4a84e8b111773b2896c9c329bafa368de196dc6310feea284bec9629e"
+  },
+  {
+    "file": "IMG_9974_original.bmp",
+    "cover": "IMG_9974.JPG",
+    "format": "bmp",
+    "width": 640,
+    "height": 853,
+    "hidden_data": null,
+    "expected": "sin_indicios",
+    "sha256": "946b73dc05ef5372e6b8b45d315318a7fc46fa7decc2b1cd288193d3116a6be8"
+  },
+  {
+    "file": "IMG_9974_lsb_aleatorio_100.png",
+    "cover": "IMG_9974.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 1,
+      "payload_bytes": 204716
+    },
+    "expected": "sospechoso",
+    "sha256": "f0fdec725fd3ef6cea71e56170ca1a8616b56bbc7e456d8d5231bad5e700b0b7"
+  },
+  {
+    "file": "IMG_9974_lsb_aleatorio_50.png",
+    "cover": "IMG_9974.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 0.5,
+      "payload_bytes": 102358
+    },
+    "expected": "sospechoso",
+    "sha256": "bc9c24ea03a0254c9764155975d5eb7e4343b2e01e8a60d9c106d5d273a43cf3"
+  },
+  {
+    "file": "IMG_9974_lsb_aleatorio_50.bmp",
+    "cover": "IMG_9974.JPG",
+    "format": "bmp",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 0.5,
+      "payload_bytes": 102358
+    },
+    "expected": "sospechoso",
+    "sha256": "a0d3732cdb52caa4082b2464d8ef953624827b9af585e028d22bb3717ec358b4"
+  },
+  {
+    "file": "IMG_9974_lsb_aleatorio_10.png",
+    "cover": "IMG_9974.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 0.1,
+      "payload_bytes": 20471
+    },
+    "expected": "no_garantizado",
+    "sha256": "d326fe3ccce618b595f8f8e17e5dd15acd4cb3531b8a08ee4d6ba30e4340f249"
+  },
+  {
+    "file": "IMG_9974_lsb_texto_100.png",
+    "cover": "IMG_9974.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "text",
+      "fill_ratio": 1,
+      "payload_bytes": 204716
+    },
+    "expected": "no_garantizado",
+    "sha256": "ba9f98a0f48124a212fd88865f3c6afda02375c978ebd6af02c94422b549c887"
+  },
+  {
+    "file": "IMG_E7306_original.png",
+    "cover": "IMG_E7306.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": null,
+    "expected": "sin_indicios",
+    "sha256": "13f02ec09bad9eadb4c3ed0a7f91de130a02f63c552d3d2c8f135b3bbe10c2e4"
+  },
+  {
+    "file": "IMG_E7306_original.bmp",
+    "cover": "IMG_E7306.JPG",
+    "format": "bmp",
+    "width": 640,
+    "height": 853,
+    "hidden_data": null,
+    "expected": "sin_indicios",
+    "sha256": "883edada42648da87ee3a1c47aa6854dbe6aa1e618cb0d353fab40751774f1b8"
+  },
+  {
+    "file": "IMG_E7306_lsb_aleatorio_100.png",
+    "cover": "IMG_E7306.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 1,
+      "payload_bytes": 204716
+    },
+    "expected": "sospechoso",
+    "sha256": "b8f0bfc0d7a84d137bc8c24bb6bc14c5c33f4cf8e6afc1ce15c63dd8dbbe18d0"
+  },
+  {
+    "file": "IMG_E7306_lsb_aleatorio_50.png",
+    "cover": "IMG_E7306.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 0.5,
+      "payload_bytes": 102358
+    },
+    "expected": "sospechoso",
+    "sha256": "c733b81ec8a44f81cbeac90d69c5502337101991cf4e8a5c8d2ae0cb948508c9"
+  },
+  {
+    "file": "IMG_E7306_lsb_aleatorio_50.bmp",
+    "cover": "IMG_E7306.JPG",
+    "format": "bmp",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 0.5,
+      "payload_bytes": 102358
+    },
+    "expected": "sospechoso",
+    "sha256": "8e4c7a505fcd98c31404de1219ecfb16b09c1fa5cb7997ec9a1bdd7194355328"
+  },
+  {
+    "file": "IMG_E7306_lsb_aleatorio_10.png",
+    "cover": "IMG_E7306.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "random",
+      "fill_ratio": 0.1,
+      "payload_bytes": 20471
+    },
+    "expected": "no_garantizado",
+    "sha256": "0c7548f1ccf3acfecd16dea870a375394aae4f394185a7c22c4b18549ef2cb2a"
+  },
+  {
+    "file": "IMG_E7306_lsb_texto_100.png",
+    "cover": "IMG_E7306.JPG",
+    "format": "png",
+    "width": 640,
+    "height": 853,
+    "hidden_data": {
+      "technique": "lsb_replacement",
+      "payload_kind": "text",
+      "fill_ratio": 1,
+      "payload_bytes": 204716
+    },
+    "expected": "no_garantizado",
+    "sha256": "64b74facd17eb2e67f7954f0f27d9b18e7ca784c1f9291cade97735f464cd677"
+  }
+]

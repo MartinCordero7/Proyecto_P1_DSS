@@ -36,6 +36,7 @@ const VARIANTS = [
 
 async function loadCover(file, width) {
   const { data, info } = await sharp(file)
+    .rotate() // apply the EXIF orientation (phone photos); the output files carry no metadata
     .resize({ width, withoutEnlargement: true })
     .toColourspace('srgb')
     .removeAlpha()

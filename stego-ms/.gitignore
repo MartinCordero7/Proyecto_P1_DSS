@@ -6,6 +6,10 @@ storage/temporary/*
 storage/quarantine/*
 !storage/quarantine/.gitkeep
 coverage/
+
+# Fotos originales de partida: llevan metadatos EXIF (GPS, fecha, modelo). No se versionan.
+# Las muestras ya procesadas (samples/generated) no conservan metadatos y sí se entregan.
+samples/covers/
 *.log
 .DS_Store
 
