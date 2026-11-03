@@ -1,8 +1,9 @@
-// jwt.strategy.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+// <-- NUEVO: Importar fs para leer el archivo de la clave pública
+import * as fs from 'fs'; 
 import { JwtPayload } from '../../interfaces/jwt-payload/jwt-payload.interface.js';
 import { AuthenticatedUser } from '../../interfaces/authenticated-user/authenticated-user.interface.js';
 import { UsersService } from '../../../users/users.service.js';
@@ -13,17 +14,19 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     configService: ConfigService,
     private readonly usersService: UsersService,
   ) {
+    // <-- NUEVO: Leer la clave pública desde el sistema de archivos
+    const publicKeyPath = configService.getOrThrow<string>('JWT_PUBLIC_KEY_PATH');
+    const publicKey = fs.readFileSync(publicKeyPath, 'utf8');
+
     super({
-      /*
-       * Authorization:
-       * Bearer eyJ...
-       */
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
+      // <-- CAMBIO: Usar la clave pública cargada en lugar del texto secreto
+      secretOrKey: publicKey, 
       issuer: configService.getOrThrow<string>('JWT_ISSUER'),
       audience: configService.getOrThrow<string>('JWT_AUDIENCE'),
-      algorithms: ['HS256'],
+      // <-- CAMBIO: Exigir estrictamente el algoritmo asimétrico RS256
+      algorithms: ['RS256'], 
     });
   }
 
@@ -37,27 +40,21 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
 
     /*
-     * Consultamos PostgreSQL.
+     * Consultamos PostgreSQL para verificar
+     * el estado actual del usuario y roles.
      */
     const user = await this.usersService.findActiveWithRoles(payload.sub);
 
     if (!user) {
-      throw new UnauthorizedException('Usuario no autorizado o inactivo');
+      throw new UnauthorizedException('Usuario no autorizado');
     }
 
-    /*
-     * Verificación de cierre de sesión.
-     * CORRECCIÓN: Si user.tokenVersion es undefined, lo tomamos como 0
-     * para evitar falsos positivos de sesión expirada.
-     */
-    const currentTokenVersion = user.tokenVersion ?? 0;
-    
-    if (payload.tokenVersion !== currentTokenVersion) {
+    if (payload.tokenVersion !== user.tokenVersion) {
       throw new UnauthorizedException('La sesión ha expirado');
     }
 
     /*
-     * Extraemos los roles de la base de datos
+     * Los roles NO salen del JWT. Salen de la BD.
      */
     const roles =
       user.userRoles

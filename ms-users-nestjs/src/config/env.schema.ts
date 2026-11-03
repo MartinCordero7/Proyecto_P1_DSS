@@ -33,9 +33,13 @@ export const envSchema = z.object({
    * JWT
    */
 
-  JWT_SECRET: z
+  /*JWT_SECRET: z
     .string()
-    .min(32, 'JWT_SECRET debe tener al menos 32 caracteres'),
+    .min(32, 'JWT_SECRET debe tener al menos 32 caracteres'),*/
+
+  // <-- NUEVAS VALIDACIONES PARA FIRMA ASIMÉTRICA -->
+  JWT_PRIVATE_KEY_PATH: z.string(),
+  JWT_PUBLIC_KEY_PATH: z.string(),
 
   JWT_EXPIRES_IN_SECONDS: z.coerce
     .number()
