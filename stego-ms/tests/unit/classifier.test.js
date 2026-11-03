@@ -104,6 +104,8 @@ describe('analysisConfig', () => {
 
   function load() {
     jest.resetModules();
+    // Hermetic: do not let the developer's real .env (loaded by src/config via dotenv) leak into the test.
+    jest.doMock('../../src/config', () => ({}));
     return require('../../src/engine/analysisConfig');
   }
 

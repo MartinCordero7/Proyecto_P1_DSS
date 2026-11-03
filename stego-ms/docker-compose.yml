@@ -1,0 +1,47 @@
+# Infraestructura de apoyo de STEGO: su propia base de datos PostgreSQL.
+# No comparte base de datos, usuario ni volumen con AUTH.
+#
+# Uso (desde la carpeta stego-ms, con el archivo .env ya creado):
+#   docker compose up -d stego-db      # levantar
+#   docker compose ps                  # ver estado
+#   docker compose down                # detener (los datos se conservan en el volumen)
+
+services:
+
+  stego-db:
+    image: postgres:18-alpine
+    container_name: stego-postgres
+
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: "${STEGO_DB_NAME:-stego_db}"
+      POSTGRES_USER: "${STEGO_DB_USER:-stego_app}"
+      POSTGRES_PASSWORD: "${STEGO_DB_PASSWORD:?STEGO_DB_PASSWORD no definido en .env}"
+
+    # Solo accesible desde esta máquina (127.0.0.1). Puerto 5433 para no chocar con la base de AUTH (5432).
+    ports:
+      - "127.0.0.1:${STEGO_DB_PORT:-5433}:5432"
+
+    volumes:
+      - stego_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${STEGO_DB_USER:-stego_app} -d ${STEGO_DB_NAME:-stego_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    security_opt:
+      - no-new-privileges:true
+
+    networks:
+      - stego-network
+
+volumes:
+  stego_postgres_data:
+
+networks:
+  stego-network:
+    driver: bridge
