@@ -7,6 +7,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "db:migrate": "node src/database/migrate.js",
+    "samples:generate": "node scripts/generate-samples.js",
+    "samples:analyze": "node scripts/analyze-samples.js",
     "test": "jest --runInBand --detectOpenHandles",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",

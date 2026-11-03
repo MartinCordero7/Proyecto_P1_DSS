@@ -46,7 +46,7 @@ describe('LsbAnalyzer', () => {
 
       for (const entry of result.chiSquare.perChannel) {
         expect(entry.windows.at(-1).samples).toBe(width * height);
-        expect(entry.windows).toHaveLength(10);
+        expect(entry.windows).toHaveLength(15);
       }
     });
 

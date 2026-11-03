@@ -6,13 +6,19 @@ const { chiSquareSurvival } = require('./statistics');
  */
 const DEFAULT_PARAMS = Object.freeze({
   // Prefixes of the pixel sequence analyzed progressively (detects partial sequential embedding).
-  windowFractions: Object.freeze([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]),
+  // Finer windows at the start improve sensitivity to small payloads (measured on 24 real photos).
+  windowFractions: Object.freeze([
+    0.02, 0.04, 0.06, 0.08, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0
+  ]),
   // Pairs of values with an expected frequency below this are excluded from chi-square.
   minExpectedFrequency: 5,
   // Minimum degrees of freedom for a chi-square window to be considered reliable.
   minDegreesOfFreedom: 20,
   // Minimum samples per channel to emit any chi-square verdict.
-  minSamplesPerChannel: 10000
+  minSamplesPerChannel: 10000,
+  // A window with fewer samples than this is not evaluated: its p-value is unreliable and,
+  // taking the maximum over many windows, it would inflate false positives.
+  minWindowSamples: 5000
 });
 
 class LsbAnalyzer {
@@ -105,7 +111,10 @@ class LsbAnalyzer {
 
       if (i + 1 === boundaries[boundaryIndex]) {
         const { chi2, df } = this.chiSquareOfPairs(histogram, params.minExpectedFrequency);
-        const reliable = df >= params.minDegreesOfFreedom && totalSamples >= params.minSamplesPerChannel;
+        const reliable =
+          df >= params.minDegreesOfFreedom &&
+          totalSamples >= params.minSamplesPerChannel &&
+          i + 1 >= params.minWindowSamples;
         windows.push({
           fraction: (i + 1) / totalSamples,
           samples: i + 1,
@@ -210,7 +219,8 @@ class LsbAnalyzer {
       parameters: {
         minExpectedFrequency: params.minExpectedFrequency,
         minDegreesOfFreedom: params.minDegreesOfFreedom,
-        minSamplesPerChannel: params.minSamplesPerChannel
+        minSamplesPerChannel: params.minSamplesPerChannel,
+        minWindowSamples: params.minWindowSamples
       }
     };
   }

@@ -109,10 +109,14 @@ p  = 1 − F_χ²(χ²; gl)                  (cola superior de la distribución 
 
 **Análisis progresivo.** Si el mensaje es más corto que la capacidad, solo se altera la
 primera parte de la imagen (en orden de lectura). Se calcula `p` sobre ventanas crecientes
-(el primer 10 %, 20 %, …, 100 % de las muestras) y se conserva el **máximo**. Así se detecta
-una incrustación parcial que, evaluada sobre la imagen completa, quedaría diluida.
-El máximo de varias ventanas aumenta la tasa de falsos positivos, lo que se compensa
-con el umbral **[a calibrar]**.
+(el primer 2 %, 4 %, 6 %, 8 %, 10 %, 15 %, 20 %, 30 %, …, 100 % de las muestras) y se
+conserva el **máximo**. Así se detecta una incrustación parcial que, evaluada sobre la imagen
+completa, quedaría diluida.
+El máximo de varias ventanas aumenta la tasa de falsos positivos. Para limitarlo, **no se
+evalúa ninguna ventana con menos de 5 000 muestras**: con pocas muestras el valor `p` es
+poco fiable (en una prueba con una imagen sintética de 200 × 200, las ventanas del 2–8 %
+produjeron `p` = 0,70 sobre un portador sin carga). Las ventanas finas del inicio solo se
+aprovechan, por tanto, en imágenes suficientemente grandes.
 
 ### 4.2 Proporción de LSB en 1 (indicador de apoyo)
 
@@ -157,7 +161,7 @@ El umbral de referencia es `threshold = 0.75`, el mismo valor del ejemplo del An
 | `con_error` | Fallo al decodificar o procesar la imagen |
 
 «Muestras suficientes»: se exige un mínimo de muestras y de pares con `e_k ≥ 5`
-(por ejemplo ≥ 10 000 muestras y gl ≥ 20) **[a calibrar]**. Las imágenes casi planas o de
+(≥ 10 000 muestras por canal, ≥ 5 000 por ventana y gl ≥ 20). Las imágenes casi planas o de
 pocos colores (capturas, ilustraciones) producen pocos pares válidos y se marcan
 `no_concluyente` en lugar de emitir un veredicto poco fiable.
 
@@ -169,6 +173,43 @@ pocos colores (capturas, ilustraciones) producen pocos pares válidos y se marca
 | `no_concluyente` | `advertencia` | Se informa, se elimina el temporal y se advierte que el resultado no es concluyente. |
 | `sin_indicios` | `aprobado` | Se elimina el temporal. |
 | `con_error` | `rechazo` | Se rechaza el archivo y se elimina el temporal. |
+
+### 5.4 Calibración con imágenes reales
+
+Se midió el detector con **24 fotografías reales** (fondos de pantalla de Windows, redimensionadas
+a 640 px de ancho y guardadas sin pérdida). A cada una se le incrustó, con el incrustador de
+referencia `scripts/lib/lsbEmbedder.js`, una carga LSB aleatoria (equivalente a un mensaje
+cifrado) a distintas proporciones de la capacidad.
+
+| Medición | Resultado |
+|---|---|
+| Originales: puntaje máximo observado | **0,0143** (0 de 24 con puntaje ≥ 0,40) |
+| Carga aleatoria del 25 % de la capacidad, detectada (puntaje ≥ 0,75) | 22 de 24 |
+| Carga aleatoria del 10 % | 9 de 24 |
+| Carga aleatoria del 3–5 % | 6 de 24 |
+| Carga aleatoria del 1 % | 1 de 24 |
+| Carga aleatoria del 50–100 % (3 fotos del conjunto de muestras) | 3 de 3 |
+| Carga de **texto plano** al 100 % (3 fotos del conjunto de muestras) | **0 de 3** |
+
+Conclusiones:
+
+- Los puntajes son **bimodales**: los originales quedan en ≈ 0 y las cargas fuertes en ≈ 1, de
+  modo que la zona intermedia (0,40–0,75) casi no se usa. Los umbrales 0,75 y 0,40 se mantienen:
+  con estos datos no hay falsos positivos y los resultados no son sensibles a su valor exacto.
+- La sensibilidad cae con cargas pequeñas (< 10 % de la capacidad): es una limitación del método
+  (§6.2), no un defecto de implementación.
+- **Una carga de texto plano no se detecta.** Los bits de un texto ASCII no son aleatorios (el bit
+  más significativo de cada carácter es 0), así que no igualan los pares de valores y el
+  chi-cuadrado no los ve. Es la limitación documentada §6.14.
+- En estas fotos (decodificadas desde JPEG) el plano LSB original tiene una correlación serial
+  alta (0,34–0,56) que una carga aleatoria completa lleva a ≈ 0. Podría servir como indicador de
+  apoyo, pero una foto con mucho ruido de sensor también tiene correlación ≈ 0 sin carga alguna,
+  por lo que **no se usa en la decisión** hasta contar con más muestras variadas.
+
+**Alcance de esta medición:** 24 imágenes de un mismo origen (JPEG decodificado) no representan
+todas las fuentes posibles. Los números describen estas muestras y no constituyen una garantía.
+El conjunto de muestras entregable (`samples/`) se genera con `npm run samples:generate` y sus
+resultados reales se registran con `npm run samples:analyze`.
 
 ## 6. Limitaciones de los métodos de detección
 
@@ -201,6 +242,11 @@ pocos colores (capturas, ilustraciones) producen pocos pares válidos y se marca
     podría atenuar la detección de una carga parcial.
 13. **Sensibilidad frente a un adversario consciente:** un atacante que conozca el
     detector puede adaptar la incrustación para evadirlo (LSB matching, tasas bajas).
+14. **Cargas de baja entropía (texto plano, datos estructurados).** El chi-cuadrado de pares
+    de valores se apoya en que los bits de la carga son casi aleatorios. Un texto ASCII, cuyos
+    bits no lo son, no iguala los pares y **no se detectó** en las muestras medidas (§5.4).
+    El método es eficaz sobre cargas cifradas o comprimidas, que son las que un atacante
+    prudente usaría, y deficiente sobre las que no lo están.
 
 ## 7. Seguridad del procesamiento
 
