@@ -1,0 +1,155 @@
+# ===========================================================================
+# docker-compose.yml — Proyecto Integrador Primer Parcial
+# Desarrollo de Software Seguro — ESPE
+#
+# Levanta los DOS microservicios independientes (AUTH + STEGO) con sus
+# respectivas bases de datos PostgreSQL, red interna y volúmenes persistentes.
+#
+# Uso:
+#   1. Copiar example.env.dist -> .env (AUTH) y .env.example -> .env (STEGO)
+#   2. Ejecutar:  docker compose up --build
+#   3. Crear tablas AUTH:  docker compose exec auth-ms node dist/database/seed.js
+#   4. Migrar STEGO:       docker compose exec stego-ms node src/database/migrate.js
+# ===========================================================================
+
+services:
+
+  # ======================== AUTH Microservice ========================
+
+  auth-db:
+    image: postgres:16-alpine
+    container_name: auth-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${AUTH_DB_DATABASE:-user_db}
+      POSTGRES_USER: ${AUTH_DB_USERNAME:-user_app}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD requerido}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USERNAME:-user_app} -d ${AUTH_DB_DATABASE:-user_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proyecto_network
+
+  auth-ms:
+    build:
+      context: ./ms-users-nestjs
+      dockerfile: Dockerfile
+    container_name: auth-ms
+    restart: unless-stopped
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      CORS_ORIGINS: http://localhost:4000,http://stego-ms:4000
+      DB_HOST: auth-db
+      DB_PORT: 5432
+      DB_USERNAME: ${AUTH_DB_USERNAME:-user_app}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD:?AUTH_DB_PASSWORD requerido}
+      DB_DATABASE: ${AUTH_DB_DATABASE:-user_db}
+      DB_SSL: "false"
+      JWT_PRIVATE_KEY_PATH: /app/src/config/keys/jwt_private.pem
+      JWT_PUBLIC_KEY_PATH: /app/src/config/keys/jwt_public.pem
+      JWT_EXPIRES_IN_SECONDS: 900
+      JWT_ISSUER: ${JWT_ISSUER:-auth-ms}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-stego-ms}
+      AUTH_SERVICE_CREDENTIAL: ${AUTH_SERVICE_CREDENTIAL:-CHANGE_ME_SERVICE_CREDENTIAL}
+    volumes:
+      - ./keys/jwt_private.pem:/app/src/config/keys/jwt_private.pem:ro
+      - ./keys/jwt_public.pem:/app/src/config/keys/jwt_public.pem:ro
+    ports:
+      - "3001:3001"
+    networks:
+      - proyecto_network
+
+  # ======================== STEGO Microservice ========================
+
+  stego-db:
+    image: postgres:16-alpine
+    container_name: stego-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${STEGO_DB_NAME:-stego_db}
+      POSTGRES_USER: ${STEGO_DB_USER:-stego_app}
+      POSTGRES_PASSWORD: ${STEGO_DB_PASSWORD:?STEGO_DB_PASSWORD requerido}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - stego_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${STEGO_DB_USER:-stego_app} -d ${STEGO_DB_NAME:-stego_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - proyecto_network
+
+  stego-ms:
+    build:
+      context: ./stego-ms
+      dockerfile: Dockerfile
+    container_name: stego-ms
+    restart: unless-stopped
+    depends_on:
+      stego-db:
+        condition: service_healthy
+      auth-ms:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      STORAGE_TEMP_PATH: /app/storage/temporary
+      STORAGE_QUARANTINE_PATH: /app/storage/quarantine
+      MAX_FILE_SIZE_BYTES: 5242880
+      MAX_IMAGE_WIDTH: 4096
+      MAX_IMAGE_HEIGHT: 4096
+      ALLOWED_MIME_TYPES: image/png,image/bmp
+      AUTH_BASE_URL: http://auth-ms:3001/api/v1/auth
+      AUTH_PUBLIC_KEY_PATH: /app/src/config/keys/auth_public_key.pem
+      AUTH_SERVICE_CREDENTIAL: ${AUTH_SERVICE_CREDENTIAL:-CHANGE_ME_SERVICE_CREDENTIAL}
+      AUTH_TIMEOUT: 5000
+      JWT_ISSUER: ${JWT_ISSUER:-auth-ms}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-stego-ms}
+      JWT_ALGORITHM: RS256
+      STEGO_SUSPICIOUS_THRESHOLD: 0.75
+      STEGO_CLEAN_THRESHOLD: 0.40
+      STEGO_DB_HOST: stego-db
+      STEGO_DB_PORT: 5432
+      STEGO_DB_USER: ${STEGO_DB_USER:-stego_app}
+      STEGO_DB_PASSWORD: ${STEGO_DB_PASSWORD:?STEGO_DB_PASSWORD requerido}
+      STEGO_DB_NAME: ${STEGO_DB_NAME:-stego_db}
+      STEGO_DB_SSL: "false"
+    volumes:
+      - stego_temp:/app/storage/temporary
+      - stego_quarantine:/app/storage/quarantine
+      - ./keys/jwt_public.pem:/app/src/config/keys/auth_public_key.pem:ro
+    ports:
+      - "4000:4000"
+    networks:
+      - proyecto_network
+
+# ======================== Persistent Volumes ========================
+volumes:
+  auth_postgres_data:
+  stego_postgres_data:
+  stego_temp:
+  stego_quarantine:
+
+# ======================== Internal Network ========================
+networks:
+  proyecto_network:
+    driver: bridge
+
