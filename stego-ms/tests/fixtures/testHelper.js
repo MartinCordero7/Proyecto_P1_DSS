@@ -5,9 +5,9 @@ const sharp = require('sharp');
 const config = require('../../src/config');
 
 // Load test RSA keys
-const privateKeyPath = path.resolve(__dirname, '../../src/config/keys/auth_private_key_test.pem');
+const privateKeyPath = path.resolve(__dirname, 'keys/test_private_key.pem');
 const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
-const publicKeyPath = path.resolve(__dirname, '../../src/config/keys/auth_public_key.pem');
+const publicKeyPath = path.resolve(__dirname, 'keys/test_public_key.pem');
 const publicKey = fs.readFileSync(publicKeyPath, 'utf8');
 
 /**
