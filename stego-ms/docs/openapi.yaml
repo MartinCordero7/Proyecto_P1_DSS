@@ -1,16 +1,22 @@
 openapi: 3.0.3
 info:
-  title: STEGO Microservice API - Persona 1
+  title: STEGO Microservice API
   version: 1.0.0
   description: |
-    Microservicio de recepción segura, validación, almacenamiento de imágenes y autorización RBAC
-    para la detección de esteganografía. Desarrollado como parte del Proyecto Integrador de Desarrollo
-    de Software Seguro (Backend V1).
-    
+    Microservicio de recepción segura, validación y análisis de imágenes para la detección de
+    esteganografía (técnica `lsb_statistical_analysis`), con persistencia de cada análisis en su propia
+    base de datos PostgreSQL y autorización RBAC vigente consultada a AUTH. Desarrollado como parte del
+    Proyecto Integrador de Desarrollo de Software Seguro (Backend V1).
+
+    Un resultado `sospechoso` es un **indicio, no una prueba** de datos ocultos. La justificación del
+    método, sus parámetros y sus limitaciones están en `docs/teoria-esteganografia.md`.
+
     ### Principios de Seguridad Implementados:
     - **Zero Trust**: La validez criptográfica de un JWT no presupone privilegios vigentes. Toda operación protegida consulta en tiempo real al microservicio AUTH (`POST /internal/authorization/check`).
     - **Secure by Design**: Recepción aislada mediante nombres UUID aleatorios, validación de firmas binarias (magic bytes), decodificación estricta de imágenes, mitigación de path traversal y eliminación de archivos temporales en errores.
     - **Shift Left Security**: Batería exhaustiva de pruebas unitarias, de integración y de seguridad contra ataques de suplantación de extensiones, imágenes corruptas y fallas controladas.
+    - **Propiedad del recurso**: un análisis solo puede consultarlo el usuario que lo solicitó (identidad tomada del JWT verificado, nunca de datos enviados por el cliente).
+    - **Auditoría**: cada petición y cada análisis dejan una línea JSON (`[AUDIT] {...}`) con campos de una lista permitida; los JWT, cabeceras y contenidos de archivo nunca se registran.
 servers:
   - url: http://localhost:4000
     description: Servidor de desarrollo local
@@ -25,8 +31,19 @@ paths:
       description: |
         Recibe un archivo de imagen en formato multipart/form-data, valida la autenticidad criptográfica
         del token JWT, verifica los privilegios RBAC vigentes ante AUTH, comprueba la firma binaria real
-        (magic bytes), MIME, dimensiones y ausencia de corrupción, calcula el hash SHA-256 original y
-        delega el análisis al motor de la Persona 2.
+        (magic bytes), MIME, dimensiones y ausencia de corrupción, calcula el hash SHA-256 original,
+        ejecuta el análisis estadístico LSB, **guarda el registro en la base de datos** y aplica la política:
+        `cuarentena` mueve el archivo a la carpeta de cuarentena; en los demás casos el archivo temporal se elimina.
+
+        | Estado | Acción |
+        |---|---|
+        | `sospechoso` | `cuarentena` |
+        | `sin_indicios` | `aprobado` |
+        | `no_concluyente` (zona intermedia, pocos datos o formato no analizable) | `advertencia` |
+        | `con_error` (no se pudo decodificar) | `rechazo` |
+
+        Si el resultado no puede guardarse se responde **503** (`RESULT_STORAGE_UNAVAILABLE`) y el archivo
+        sospechoso se aísla igualmente.
       operationId: analyzeImage
       security:
         - BearerAuth: []
@@ -58,10 +75,24 @@ paths:
                 technique: "lsb_statistical_analysis"
                 status: "sospechoso"
                 indicators:
-                  anomaly_score: 0.82
+                  anomaly_score: 1
                   threshold: 0.75
+                  clean_threshold: 0.4
+                  reason: "score_above_suspicious_threshold"
+                  format: "png"
+                  width: 640
+                  height: 853
+                  channels_analyzed: 3
+                  samples_per_channel: 545920
+                  chi_square_p_max: 1
+                  chi_square_window_fraction: 0.5
+                  chi_square_channel: 1
+                  lsb_ratio: 0.4999
+                  lsb_ratio_zscore: 0.4
+                  serial_correlation: 0.0006
                 action: "cuarentena"
-                limitations: "Resultado indicativo, no concluyente"
+                limitations: "Resultado indicativo, no concluyente: un puntaje alto sugiere una posible incrustación LSB, pero puede ser un falso positivo y no prueba la existencia de datos ocultos."
+                analyzed_at: "2026-11-04T15:00:00.000Z"
         '400':
           description: Solicitud incorrecta (archivo ausente o campo no válido).
           content:
@@ -132,33 +163,37 @@ paths:
                 error:
                   code: "INTERNAL_SERVER_ERROR"
                   message: "An internal server error occurred while processing the request"
-        '501':
-          description: Motor de análisis esteganográfico no conectado (módulo Persona 2 pendiente).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: "ENGINE_NOT_IMPLEMENTED"
-                  message: "Steganography analysis engine is not yet connected (Persona 2 module pending)"
         '503':
-          description: Microservicio AUTH no disponible o decisión de autorización no verificable.
+          description: |
+            Fallo seguro. Dos causas posibles:
+            - AUTH no disponible o con una decisión de autorización no verificable (`AUTH_SERVICE_UNAVAILABLE`): no se procesa el archivo.
+            - El resultado no pudo guardarse en la base de datos (`RESULT_STORAGE_UNAVAILABLE`): no se devuelve un análisis que no pueda auditarse ni recuperarse.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: "AUTH_SERVICE_UNAVAILABLE"
-                  message: "Authorization service (AUTH) is unavailable or unreachable"
+              examples:
+                auth_unavailable:
+                  summary: AUTH inaccesible
+                  value:
+                    error:
+                      code: "AUTH_SERVICE_UNAVAILABLE"
+                      message: "Authorization service (AUTH) is unavailable or unreachable"
+                storage_unavailable:
+                  summary: Base de datos de STEGO inaccesible
+                  value:
+                    error:
+                      code: "RESULT_STORAGE_UNAVAILABLE"
+                      message: "The analysis result could not be stored"
 
   /api/steganography/results/{id}:
     get:
       summary: Consultar un resultado de análisis por identificador
       description: |
-        Consulta un análisis previamente registrado. Verifica la autenticación JWT y consulta en AUTH
-        la autorización vigente y la propiedad sobre el recurso solicitado.
+        Consulta un análisis previamente registrado. Verifica la autenticación JWT, consulta en AUTH la
+        autorización vigente (acción `steganography.view_result`) y comprueba que el análisis **pertenezca
+        al usuario autenticado**: la propiedad la decide STEGO, porque solo STEGO conoce quién solicitó
+        cada análisis. Un identificador inexistente o con formato no válido responde 404.
       operationId: getAnalysisResult
       security:
         - BearerAuth: []
@@ -166,9 +201,10 @@ paths:
         - name: id
           in: path
           required: true
-          description: UUID o identificador del análisis
+          description: Identificador (UUID) del análisis
           schema:
             type: string
+            format: uuid
           example: "7f4c51e0-639a-4c22-b5e1-0c4a45719e71"
       responses:
         '200':
@@ -184,11 +220,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '403':
-          description: Usuario sin privilegios RBAC o sin propiedad sobre el recurso en AUTH.
+          description: |
+            Acceso denegado. Dos causas posibles:
+            - AUTH deniega la acción (`AUTHORIZATION_DENIED`).
+            - El análisis existe pero pertenece a otro usuario (`RESULT_ACCESS_DENIED`); no se revela ningún dato del resultado.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                role_denied:
+                  summary: AUTH deniega la acción
+                  value:
+                    error:
+                      code: "AUTHORIZATION_DENIED"
+                      message: "Access denied: Active roles do not grant permission for this operation"
+                not_owner:
+                  summary: El análisis es de otro usuario
+                  value:
+                    error:
+                      code: "RESULT_ACCESS_DENIED"
+                      message: "You are not authorized to view this analysis result"
         '404':
           description: Resultado no encontrado en el repositorio de persistencia.
           content:
@@ -199,12 +251,6 @@ paths:
                 error:
                   code: "NOT_FOUND"
                   message: "Analysis result with ID '7f4c51e0-639a-4c22-b5e1-0c4a45719e71' was not found"
-        '501':
-          description: Repositorio de resultados de la Persona 2 aún no conectado.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '503':
           description: Microservicio AUTH inaccesible para verificar permisos sobre el recurso.
           content:
@@ -237,6 +283,7 @@ components:
   schemas:
     AnalysisResponse:
       type: object
+      required: [analysis_id, user_id, filename, sha256, technique, status, indicators, action, limitations, analyzed_at]
       properties:
         analysis_id:
           type: string
@@ -256,13 +303,71 @@ components:
           type: string
           enum: [sin_indicios, sospechoso, no_concluyente, con_error]
         indicators:
-          type: object
-          additionalProperties: true
+          $ref: '#/components/schemas/Indicators'
         action:
           type: string
           enum: [aprobado, advertencia, cuarentena, rechazo]
         limitations:
           type: string
+          description: Texto que explica el alcance y los límites del resultado.
+        analyzed_at:
+          type: string
+          format: date-time
+
+    Indicators:
+      type: object
+      description: |
+        Indicadores calculados. `anomaly_score`, `threshold`, `clean_threshold` y `reason` están
+        siempre presentes; el resto solo cuando la imagen pudo analizarse.
+      required: [anomaly_score, threshold, clean_threshold, reason]
+      properties:
+        anomaly_score:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 1
+          description: Mayor probabilidad chi-cuadrado de «pares de valores igualados» (cercana a 1 => consistente con LSB). Nulo si no hay datos suficientes o no se pudo analizar.
+        threshold:
+          type: number
+          description: Umbral desde el cual el resultado es `sospechoso` (configurable, por defecto 0.75).
+        clean_threshold:
+          type: number
+          description: Por debajo de este puntaje el resultado es `sin_indicios` (configurable, por defecto 0.40).
+        reason:
+          type: string
+          description: Motivo de la clasificación (`score_above_suspicious_threshold`, `score_below_clean_threshold`, `score_in_intermediate_zone`, `insufficient_data`, `palette_image`, `unsupported_bit_depth`, `image_decode_failed`, ...).
+        format:
+          type: string
+          enum: [png, bmp]
+        width:
+          type: integer
+        height:
+          type: integer
+        channels_analyzed:
+          type: integer
+          enum: [1, 3]
+        samples_per_channel:
+          type: integer
+        chi_square_p_max:
+          type: number
+          nullable: true
+        chi_square_window_fraction:
+          type: number
+          nullable: true
+          description: Fracción de la imagen (en orden de lectura) donde se obtuvo el máximo.
+        chi_square_channel:
+          type: integer
+          nullable: true
+          description: Canal (0=R, 1=G, 2=B) donde se obtuvo el máximo.
+        lsb_ratio:
+          type: number
+          description: Proporción de LSB en 1 (indicador de apoyo).
+        lsb_ratio_zscore:
+          type: number
+        serial_correlation:
+          type: number
+          nullable: true
+          description: Correlación entre LSB de píxeles vecinos (indicador de apoyo).
 
     ErrorResponse:
       type: object

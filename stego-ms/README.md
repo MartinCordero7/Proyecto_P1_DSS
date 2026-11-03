@@ -1,7 +1,7 @@
-# STEGO Microservice — Persona 1
+# STEGO Microservice — Personas 1 y 2
 
-> **Proyecto Integrador Primer Parcial — Desarrollo de Software Seguro**  
-> **Universidad de las Fuerzas Armadas ESPE**  
+> **Proyecto Integrador Primer Parcial — Desarrollo de Software Seguro**
+> **Universidad de las Fuerzas Armadas ESPE**
 > **Backend V1: Autenticación JWT/RBAC y detección de esteganografía**
 
 ---
@@ -10,10 +10,10 @@
 
 El microservicio **STEGO** es el encargado de la recepción segura de imágenes, validación estricta de formato e integridad, cálculo criptográfico de huellas digitales (SHA-256), gestión de almacenamiento temporal y en cuarentena, y la verificación de identidad (JWT) y autorización en tiempo real (RBAC) mediante comunicación entre microservicios con **AUTH**.
 
-Este componente corresponde a la implementación de la **PERSONA 1**, diseñada bajo los enfoques:
+Este componente reúne la implementación de la **PERSONA 1** (recepción segura, validación e integración con AUTH) y de la **PERSONA 2** (análisis esteganográfico LSB, clasificación, persistencia en PostgreSQL, muestras y auditoría), diseñada bajo los enfoques:
 - **Zero Trust (NIST SP 800-207)**: La validez de firma de un token JWT no presupone que los roles o privilegios del usuario sigan vigentes. Cada solicitud protegida consulta en tiempo real a `AUTH` sin almacenar decisiones en caché. En caso de caída de `AUTH`, se aplica **Denegación por Defecto (Fail Secure)**.
 - **Secure by Design & ASVS 5.0**: Nombres de archivo aleatorizados (UUID v4) para mitigar *Path Traversal*, comprobación estricta de firmas binarias (*Magic Bytes* con `file-type`), límites estrictos de tamaño y dimensiones (`sharp`), y sanitización de metadatos.
-- **Shift Left Security**: Batería exhaustiva de 65 pruebas automatizadas (unitarias, de integración y de seguridad contra ataques).
+- **Shift Left Security**: Batería de 189 pruebas automatizadas (unitarias, de integración y de seguridad contra ataques), más 9 pruebas contra PostgreSQL real (`npm run test:db`).
 
 ---
 
@@ -101,6 +101,34 @@ stego-ms/
 
 ---
 
+### 3.1 Módulos añadidos por la Persona 2
+
+```
+stego-ms/
+├── src/
+│   ├── engine/                # Motor de análisis esteganográfico
+│   │   ├── pixelReader.js     # Lee píxeles de PNG y BMP en un formato común
+│   │   ├── lsbAnalyzer.js     # Chi-cuadrado de pares de valores (progresivo), proporción LSB, correlación serial
+│   │   ├── statistics.js      # Distribución chi-cuadrado sin dependencias externas
+│   │   ├── classifier.js      # Estados (sin_indicios / sospechoso / no_concluyente / con_error) y acciones
+│   │   ├── analysisConfig.js  # Umbrales configurables (STEGO_SUSPICIOUS_THRESHOLD, STEGO_CLEAN_THRESHOLD)
+│   │   ├── lsbEngine.js       # Orquesta lectura + análisis + clasificación y arma el registro (contrato)
+│   │   └── errors.js
+│   ├── repositories/analysisRepository.js   # Persistencia en PostgreSQL (consultas parametrizadas)
+│   ├── database/              # Conexión (pool), configuración y migraciones SQL
+│   ├── bootstrap/registerModules.js         # Conecta motor y repositorio al arrancar
+│   ├── middlewares/accessLog.middleware.js  # Registro de accesos
+│   └── utils/audit.js         # Auditoría JSON con lista de campos permitidos (sin JWT ni secretos)
+├── db/migrations/             # Migraciones SQL (tabla analysis_results)
+├── scripts/                   # Generador y analizador de muestras (herramientas de prueba)
+├── samples/                   # Imágenes originales y con carga LSB + resultados reales
+├── docs/
+│   ├── teoria-esteganografia.md   # Fundamentos, método, parámetros, calibración y limitaciones
+│   ├── matriz-riesgos-stego.md    # Activos, amenazas, controles y brechas conocidas
+│   └── openapi.yaml
+└── docker-compose.yml         # PostgreSQL propio de STEGO
+```
+
 ## 4. Endpoints Expuestos
 
 ### 1. `POST /api/steganography/analyze`
@@ -116,24 +144,22 @@ stego-ms/
   - Límite de tamaño configurable (`max: 5 MB`).
   - Cálculo de `SHA-256` sobre bytes brutos originales.
 - **Respuestas**:
-  - `200 OK`: Análisis completado por el motor de Persona 2.
+  - `200 OK`: Análisis completado, guardado en la base de datos y devuelto (estado, acción, indicadores y limitaciones).
   - `400 Bad Request`: Campo `image` ausente.
   - `401 Unauthorized`: Token ausente, vencido o alterado.
   - `403 Forbidden`: Usuario sin permiso vigente en AUTH.
   - `413 Payload Too Large`: Archivo excede el límite de tamaño.
   - `415 Unsupported Media Type`: Extensión no permitida o suplantación de extensión detectada.
   - `422 Unprocessable Entity`: Imagen corrupta, truncada o dimensiones excesivas.
-  - `501 Not Implemented`: Motor de análisis no conectado (pendiente Persona 2).
-  - `503 Service Unavailable`: AUTH inaccesible o decisión no verificable.
+  - `503 Service Unavailable`: AUTH inaccesible o decisión no verificable (`AUTH_SERVICE_UNAVAILABLE`), o el resultado no pudo guardarse (`RESULT_STORAGE_UNAVAILABLE`).
 
 ### 2. `GET /api/steganography/results/:id`
 - **Autenticación**: `Authorization: Bearer <JWT>`.
 - **Autorización RBAC**: Consulta a `AUTH` para `steganography.view_result` con `resource_id`.
 - **Respuestas**:
   - `200 OK`: Objeto de resultado recuperado.
-  - `403 Forbidden`: No autorizado a ver este recurso.
-  - `404 Not Found`: Resultado no encontrado.
-  - `501 Not Implemented`: Repositorio de BD no conectado (pendiente Persona 2).
+  - `403 Forbidden`: AUTH deniega la acción (`AUTHORIZATION_DENIED`) o el análisis pertenece a otro usuario (`RESULT_ACCESS_DENIED`).
+  - `404 Not Found`: Resultado no encontrado (o identificador con formato no válido).
 
 ### 3. `GET /health`
 - Endpoint público de comprobación de salud para Docker / orquestador. Devuelve `200 OK`.
@@ -178,7 +204,9 @@ Ejemplo:
 }
 ```
 
-### Cómo conecta Persona 2 su implementación:
+### Cómo se conecta el motor (ya implementado)
+
+En el servicio real lo hace `registerAnalysisModules()` ([`src/bootstrap/registerModules.js`](src/bootstrap/registerModules.js)) al arrancar `server.js`, con `lsbEngine` y `analysisRepository`. El fragmento siguiente muestra la forma genérica del contrato:
 Persona 2 simplemente registra su clase/módulo en `src/services/steganographyEngine.service.js`:
 ```javascript
 const steganographyEngineService = require('./services/steganographyEngine.service');
@@ -245,6 +273,12 @@ Variables disponibles:
 | `AUTH_PUBLIC_KEY_PATH` | Ruta a la clave pública de AUTH | `./src/config/keys/auth_public_key.pem` |
 | `AUTH_SERVICE_CREDENTIAL`| Token secreto de servicio STEGO -> AUTH | Token configurado en AUTH |
 | `AUTH_TIMEOUT` | Timeout de peticiones hacia AUTH (ms) | `5000` |
+| `STEGO_SUSPICIOUS_THRESHOLD` | Puntaje (0-1) desde el cual el resultado es `sospechoso` | `0.75` |
+| `STEGO_CLEAN_THRESHOLD` | Por debajo de este puntaje el resultado es `sin_indicios` | `0.40` |
+| `STEGO_DB_HOST` / `STEGO_DB_PORT` | Servidor y puerto de PostgreSQL de STEGO | `localhost` / `5433` |
+| `STEGO_DB_USER` / `STEGO_DB_NAME` | Usuario y base de datos | `stego_app` / `stego_db` |
+| `STEGO_DB_PASSWORD` | Contraseña de la base (**obligatoria**, sin valor por defecto, mínimo 12 caracteres) | — |
+| `STEGO_DB_SSL` | Usar TLS hacia la base de datos | `false` |
 
 ### Instalación y Ejecución Local
 ```bash
@@ -257,6 +291,19 @@ npm run dev
 # Iniciar en producción
 npm start
 ```
+
+### Base de datos PostgreSQL (propia de STEGO)
+
+STEGO guarda cada análisis en su **propia** base de datos; no comparte tablas ni credenciales con AUTH.
+Requiere Docker Desktop abierto y `STEGO_DB_PASSWORD` definido en `.env`:
+
+```bash
+docker compose up -d stego-db     # levantar PostgreSQL (puerto 5433)
+docker compose ps                 # esperar el estado "healthy"
+npm run db:migrate                # crear la tabla analysis_results
+```
+
+Para detenerla conservando los datos: `docker compose down`. Para borrarla por completo: `docker compose down -v`.
 
 ### Ejecución de Pruebas
 ```bash
@@ -274,6 +321,16 @@ npm run test:integration
 ```
 
 ---
+
+### Pruebas contra la base real y muestras
+
+```bash
+npm run test:db                                                   # repositorio contra PostgreSQL real
+npm run samples:generate -- --covers samples/covers --out samples/generated
+npm run samples:analyze  -- --dir samples/generated --report samples/resultados.md
+```
+
+Las muestras y su informe de resultados reales están descritos en [`samples/README.md`](samples/README.md).
 
 ## 8. Despliegue con Docker
 

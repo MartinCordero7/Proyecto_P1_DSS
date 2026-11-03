@@ -1,7 +1,7 @@
 # Proyecto Integrador Primer Parcial — Backend V1: Autenticación JWT/RBAC y Detección de Esteganografía
 
-> **Universidad de las Fuerzas Armadas ESPE**  
-> **Departamento de Ciencias de la Computación**  
+> **Universidad de las Fuerzas Armadas ESPE**
+> **Departamento de Ciencias de la Computación**
 > **Asignatura: Desarrollo de Software Seguro**
 
 ---
@@ -49,3 +49,13 @@ Proyecto_1P_SS/
 9. **Pruebas Automatizadas**: 65 pruebas automatizadas divididas en unitarias (`tests/unit`), de integración con Supertest (`tests/integration`) y de seguridad contra vectores de ataque (`tests/security`).
 10. **Documentación y Contenerización**: Especificación OpenAPI 3.0 (`docs/openapi.yaml`) y Dockerfile para ejecución autónoma.
 
+## Responsabilidades Implementadas (Persona 2 — Análisis y persistencia)
+
+1. **Motor de análisis esteganográfico LSB** (`stego-ms/src/engine/`): lectura de píxeles de PNG y BMP, test chi-cuadrado de pares de valores (progresivo, para detectar cargas parciales), proporción de LSB en 1 y correlación serial.
+2. **Clasificación y política de acción**: estados `sin_indicios`, `sospechoso`, `no_concluyente` y `con_error`, con las acciones `aprobado`, `cuarentena`, `advertencia` y `rechazo`; umbrales configurables y calibrados con imágenes reales.
+3. **Modelo de registro y persistencia en PostgreSQL**: migración SQL con restricciones de integridad, repositorio con consultas parametrizadas y base de datos propia de STEGO (`stego-ms/docker-compose.yml`).
+4. **Integración con la API**: cada análisis se guarda; un resultado solo lo consulta su propietario; si no puede guardarse la operación falla de forma segura (503).
+5. **Auditoría** sin datos sensibles: registro de accesos y análisis con lista de campos permitidos (nunca JWT ni contenido).
+6. **Muestras y evidencias** (`stego-ms/samples/`): imágenes originales y con carga LSB real, generadas de forma reproducible, con los resultados reales del detector.
+7. **Documentación**: fundamentos y limitaciones (`stego-ms/docs/teoria-esteganografia.md`), matriz de riesgos (`stego-ms/docs/matriz-riesgos-stego.md`) y OpenAPI actualizado.
+8. **Pruebas**: 189 automatizadas (unitarias, integración y seguridad) más 9 contra PostgreSQL real.

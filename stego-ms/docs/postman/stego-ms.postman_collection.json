@@ -1,0 +1,285 @@
+{
+  "info": {
+    "name": "STEGO + AUTH - Backend V1",
+    "description": "Colección de solicitudes REST del Proyecto Integrador. Flujo: 1) iniciar sesión en AUTH (guarda el JWT en la variable `token`), 2) analizar una imagen en STEGO (guarda `analysisId`), 3) consultar el resultado. Incluye casos negativos (sin token, token inválido, formato no permitido, resultado ajeno).\n\nAntes de usarla: levantar AUTH (puerto 3001) y STEGO (puerto 4000), y reemplazar `username` y `password` en las variables de la colección por los de un usuario con rol ADMIN o ANALYST. No guardes contraseñas reales en el repositorio.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "authUrl", "value": "http://localhost:3001/api/v1" },
+    { "key": "stegoUrl", "value": "http://localhost:4000" },
+    { "key": "username", "value": "CAMBIAR_USUARIO" },
+    { "key": "password", "value": "CAMBIAR_CLAVE" },
+    { "key": "token", "value": "" },
+    { "key": "analysisId", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "1. AUTH",
+      "item": [
+        {
+          "name": "Login (obtiene el JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login correcto (200)', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Devuelve accessToken', () => pm.expect(body.accessToken).to.be.a('string'));",
+                  "pm.collectionVariables.set('token', body.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": { "raw": "{{authUrl}}/auth/login", "host": ["{{authUrl}}"], "path": ["auth", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. STEGO - flujo correcto",
+      "item": [
+        {
+          "name": "Health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('STEGO operativo (200)', () => pm.response.to.have.status(200));",
+                  "pm.test('Servicio stego-ms', () => pm.expect(pm.response.json().service).to.eql('stego-ms'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{stegoUrl}}/health", "host": ["{{stegoUrl}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Analizar imagen (muestra con carga LSB)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Análisis completado (200)', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Contiene el registro del análisis', () => {",
+                  "  pm.expect(body).to.have.all.keys('analysis_id','user_id','filename','sha256','technique','status','indicators','action','limitations','analyzed_at');",
+                  "});",
+                  "pm.test('Estado válido', () => pm.expect(['sin_indicios','sospechoso','no_concluyente','con_error']).to.include(body.status));",
+                  "pm.collectionVariables.set('analysisId', body.analysis_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": "samples/generated/IMG_9974_lsb_aleatorio_50.png",
+                  "description": "Elegir una imagen de stego-ms/samples/generated (PNG o BMP)"
+                }
+              ]
+            },
+            "url": { "raw": "{{stegoUrl}}/api/steganography/analyze", "host": ["{{stegoUrl}}"], "path": ["api", "steganography", "analyze"] }
+          }
+        },
+        {
+          "name": "Analizar imagen original (sin datos ocultos)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Análisis completado (200)', () => pm.response.to.have.status(200));",
+                  "pm.test('Original aprobada', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('sin_indicios');",
+                  "  pm.expect(body.action).to.eql('aprobado');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "image", "type": "file", "src": "samples/generated/IMG_9974_original.png" }
+              ]
+            },
+            "url": { "raw": "{{stegoUrl}}/api/steganography/analyze", "host": ["{{stegoUrl}}"], "path": ["api", "steganography", "analyze"] }
+          }
+        },
+        {
+          "name": "Consultar resultado propio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Resultado recuperado (200)', () => pm.response.to.have.status(200));",
+                  "pm.test('Coincide con el análisis solicitado', () => pm.expect(pm.response.json().analysis_id).to.eql(pm.collectionVariables.get('analysisId')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{stegoUrl}}/api/steganography/results/{{analysisId}}", "host": ["{{stegoUrl}}"], "path": ["api", "steganography", "results", "{{analysisId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. STEGO - casos negativos",
+      "item": [
+        {
+          "name": "T03 Sin token -> 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Sin token (401)', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "image", "type": "file", "src": "samples/generated/IMG_9974_original.png" }]
+            },
+            "url": { "raw": "{{stegoUrl}}/api/steganography/analyze", "host": ["{{stegoUrl}}"], "path": ["api", "steganography", "analyze"] }
+          }
+        },
+        {
+          "name": "T03 Token manipulado -> 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Token manipulado (401)', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}MANIPULADO", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "image", "type": "file", "src": "samples/generated/IMG_9974_original.png" }]
+            },
+            "url": { "raw": "{{stegoUrl}}/api/steganography/analyze", "host": ["{{stegoUrl}}"], "path": ["api", "steganography", "analyze"] }
+          }
+        },
+        {
+          "name": "T10 Archivo no permitido (.txt) -> 415",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Formato no permitido (415)', () => pm.response.to.have.status(415));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": "samples/README.md",
+                  "description": "Cualquier archivo que no sea PNG/BMP, por ejemplo un .md o .txt"
+                }
+              ]
+            },
+            "url": { "raw": "{{stegoUrl}}/api/steganography/analyze", "host": ["{{stegoUrl}}"], "path": ["api", "steganography", "analyze"] }
+          }
+        },
+        {
+          "name": "T11 Resultado inexistente -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Resultado inexistente (404)', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{stegoUrl}}/api/steganography/results/00000000-0000-4000-8000-000000000000",
+              "host": ["{{stegoUrl}}"],
+              "path": ["api", "steganography", "results", "00000000-0000-4000-8000-000000000000"]
+            }
+          }
+        },
+        {
+          "name": "T11 Resultado de otro usuario -> 403 (iniciar sesión con OTRO usuario y usar el analysisId del primero)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Resultado ajeno denegado (403)', () => pm.response.to.have.status(403));",
+                  "pm.test('Sin datos del resultado', () => pm.expect(JSON.stringify(pm.response.json())).to.not.include('sha256'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{stegoUrl}}/api/steganography/results/{{analysisId}}", "host": ["{{stegoUrl}}"], "path": ["api", "steganography", "results", "{{analysisId}}"] }
+          }
+        }
+      ]
+    }
+  ]
+}
