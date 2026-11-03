@@ -22,8 +22,8 @@ COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 # Copy source code and default config
+# (docs/ is excluded by .dockerignore and is not needed at runtime)
 COPY src/ ./src/
-COPY docs/ ./docs/
 
 # Create persistent storage directories with non-root ownership
 RUN mkdir -p storage/temporary storage/quarantine \
